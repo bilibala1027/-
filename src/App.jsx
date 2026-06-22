@@ -843,6 +843,7 @@ const strengths = [
 
 function MotionVideo() {
   const [shouldRenderVideo, setShouldRenderVideo] = useState(false);
+  const [hasVideoError, setHasVideoError] = useState(false);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: no-preference)');
@@ -852,7 +853,7 @@ function MotionVideo() {
     return () => media.removeEventListener('change', update);
   }, []);
 
-  if (!shouldRenderVideo) {
+  if (!shouldRenderVideo || hasVideoError) {
     return <div className="hero-video hero-video-fallback" aria-hidden="true" />;
   }
 
@@ -865,6 +866,7 @@ function MotionVideo() {
       loop
       playsInline
       preload="metadata"
+      onError={() => setHasVideoError(true)}
       aria-hidden="true"
     />
   );
@@ -944,10 +946,25 @@ function ProjectGalleryWindow({ sections, images, title, isOverlay = false, onCl
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const dragState = useRef(null);
+  const touchState = useRef({
+    mode: null,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    originX: 0,
+    originY: 0,
+    distance: 0,
+    zoom: 1,
+  });
   const activeImage = images[activeIndex];
   const minZoom = 1;
   const maxZoom = 2.6;
   const clampZoom = (value) => Math.min(maxZoom, Math.max(minZoom, Number(value.toFixed(2))));
+  const getTouchDistance = (touches) => {
+    const [first, second] = touches;
+    return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
+  };
   const updateZoom = (nextValue) => {
     setZoom((currentZoom) => {
       const value = typeof nextValue === 'function' ? nextValue(currentZoom) : nextValue;
@@ -963,6 +980,7 @@ function ProjectGalleryWindow({ sections, images, title, isOverlay = false, onCl
     updateZoom((currentZoom) => currentZoom + (event.deltaY > 0 ? -0.12 : 0.12));
   };
   const handleDragStart = (event) => {
+    if (event.pointerType === 'touch') return;
     if (zoom <= 1) {
       return;
     }
@@ -994,6 +1012,95 @@ function ProjectGalleryWindow({ sections, images, title, isOverlay = false, onCl
       event.currentTarget.releasePointerCapture(dragState.current.pointerId);
     }
     dragState.current = null;
+  };
+  const handleTouchStart = (event) => {
+    if (event.touches.length === 2) {
+      touchState.current = {
+        mode: 'pinch',
+        startX: 0,
+        startY: 0,
+        lastX: 0,
+        lastY: 0,
+        originX: pan.x,
+        originY: pan.y,
+        distance: getTouchDistance(event.touches),
+        zoom,
+      };
+      return;
+    }
+
+    if (event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    touchState.current = {
+      mode: 'swipe',
+      startX: touch.clientX,
+      startY: touch.clientY,
+      lastX: touch.clientX,
+      lastY: touch.clientY,
+      originX: pan.x,
+      originY: pan.y,
+      distance: 0,
+      zoom,
+    };
+  };
+  const handleTouchMove = (event) => {
+    const currentTouch = touchState.current;
+
+    if (event.touches.length === 2 && currentTouch.mode === 'pinch') {
+      event.preventDefault();
+      const distance = getTouchDistance(event.touches);
+      if (!currentTouch.distance) return;
+      updateZoom(currentTouch.zoom * (distance / currentTouch.distance));
+      return;
+    }
+
+    if (event.touches.length !== 1 || currentTouch.mode !== 'swipe') return;
+
+    const touch = event.touches[0];
+    currentTouch.lastX = touch.clientX;
+    currentTouch.lastY = touch.clientY;
+    const deltaX = currentTouch.lastX - currentTouch.startX;
+    const deltaY = currentTouch.lastY - currentTouch.startY;
+
+    if (zoom > 1.02) {
+      event.preventDefault();
+      setPan({
+        x: currentTouch.originX + deltaX,
+        y: currentTouch.originY + deltaY,
+      });
+      return;
+    }
+
+    if (zoom <= 1.02 && Math.abs(deltaX) > 14 && Math.abs(deltaX) > Math.abs(deltaY) * 1.15) {
+      event.preventDefault();
+    }
+  };
+  const handleTouchEnd = () => {
+    const currentTouch = touchState.current;
+    if (currentTouch.mode === 'swipe' && zoom <= 1.02) {
+      const deltaX = currentTouch.lastX - currentTouch.startX;
+      const deltaY = currentTouch.lastY - currentTouch.startY;
+      if (Math.abs(deltaX) > 54 && Math.abs(deltaX) > Math.abs(deltaY) * 1.4) {
+        if (deltaX < 0) {
+          showNext();
+        } else {
+          showPrevious();
+        }
+      }
+    }
+
+    touchState.current = {
+      mode: null,
+      startX: 0,
+      startY: 0,
+      lastX: 0,
+      lastY: 0,
+      originX: 0,
+      originY: 0,
+      distance: 0,
+      zoom: 1,
+    };
   };
   const closeGallery = () => {
     if (onClose) {
@@ -1052,7 +1159,14 @@ function ProjectGalleryWindow({ sections, images, title, isOverlay = false, onCl
         <button className="gallery-nav gallery-nav-prev" type="button" aria-label="上一张" onClick={showPrevious}>
           ‹
         </button>
-        <figure className="gallery-viewer" onWheel={handleViewerWheel}>
+        <figure
+          className="gallery-viewer"
+          onWheel={handleViewerWheel}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+        >
           <span
             className="gallery-image-card"
             style={{
@@ -1112,6 +1226,17 @@ export default function App() {
     pointerId: null,
     startX: 0,
     startY: 0,
+    scrollLeft: 0,
+    scrollTop: 0,
+  });
+  const modelRenderTouchRef = useRef({
+    mode: null,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    distance: 0,
+    zoom: MODEL_RENDER_MIN_ZOOM,
     scrollLeft: 0,
     scrollTop: 0,
   });
@@ -1203,7 +1328,21 @@ export default function App() {
     });
   };
 
+  const showAdjacentModelRender = (direction) => {
+    if (!selectedModelRender) return;
+    const currentIndex = modelRenderItems.findIndex((item) => item.id === selectedModelRender.id);
+    if (currentIndex < 0) return;
+    const nextIndex = (currentIndex + direction + modelRenderItems.length) % modelRenderItems.length;
+    setSelectedModelRender(modelRenderItems[nextIndex]);
+  };
+
+  const getModelRenderTouchDistance = (touches) => {
+    const [first, second] = touches;
+    return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
+  };
+
   const handleModelRenderPointerDown = (event) => {
+    if (event.pointerType === 'touch') return;
     if (event.button !== 0) return;
     const viewport = modelRenderViewportRef.current;
     if (!viewport) return;
@@ -1236,6 +1375,98 @@ export default function App() {
     }
     modelRenderDragRef.current.pointerId = null;
     setIsModelRenderDragging(false);
+  };
+
+  const handleModelRenderTouchStart = (event) => {
+    const viewport = modelRenderViewportRef.current;
+    if (!viewport) return;
+
+    if (event.touches.length === 2) {
+      modelRenderTouchRef.current = {
+        mode: 'pinch',
+        startX: 0,
+        startY: 0,
+        lastX: 0,
+        lastY: 0,
+        distance: getModelRenderTouchDistance(event.touches),
+        zoom: modelRenderZoom,
+        scrollLeft: viewport.scrollLeft,
+        scrollTop: viewport.scrollTop,
+      };
+      return;
+    }
+
+    if (event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    modelRenderTouchRef.current = {
+      mode: 'swipe',
+      startX: touch.clientX,
+      startY: touch.clientY,
+      lastX: touch.clientX,
+      lastY: touch.clientY,
+      distance: 0,
+      zoom: modelRenderZoom,
+      scrollLeft: viewport.scrollLeft,
+      scrollTop: viewport.scrollTop,
+    };
+  };
+
+  const handleModelRenderTouchMove = (event) => {
+    const viewport = modelRenderViewportRef.current;
+    const state = modelRenderTouchRef.current;
+    if (!viewport) return;
+
+    if (event.touches.length === 2 && state.mode === 'pinch') {
+      event.preventDefault();
+      const distance = getModelRenderTouchDistance(event.touches);
+      if (!state.distance) return;
+      const nextZoom = state.zoom * (distance / state.distance);
+      setModelRenderZoom(Math.min(MODEL_RENDER_MAX_ZOOM, Math.max(MODEL_RENDER_MIN_ZOOM, Number(nextZoom.toFixed(2)))));
+      return;
+    }
+
+    if (event.touches.length !== 1 || state.mode !== 'swipe') return;
+
+    const touch = event.touches[0];
+    state.lastX = touch.clientX;
+    state.lastY = touch.clientY;
+    const deltaX = state.lastX - state.startX;
+    const deltaY = state.lastY - state.startY;
+
+    if (modelRenderZoom > MODEL_RENDER_MIN_ZOOM + 0.02) {
+      event.preventDefault();
+      viewport.scrollLeft = state.scrollLeft - deltaX;
+      viewport.scrollTop = state.scrollTop - deltaY;
+      return;
+    }
+
+    if (Math.abs(deltaX) > 14 && Math.abs(deltaX) > Math.abs(deltaY) * 1.15) {
+      event.preventDefault();
+    }
+  };
+
+  const handleModelRenderTouchEnd = () => {
+    const state = modelRenderTouchRef.current;
+    if (state.mode === 'swipe' && modelRenderZoom <= MODEL_RENDER_MIN_ZOOM + 0.02) {
+      const deltaX = state.lastX - state.startX;
+      const deltaY = state.lastY - state.startY;
+      if (Math.abs(deltaX) > 54 && Math.abs(deltaX) > Math.abs(deltaY) * 1.4) {
+        showAdjacentModelRender(deltaX < 0 ? 1 : -1);
+      }
+    }
+
+    modelRenderTouchRef.current = {
+      mode: null,
+      startX: 0,
+      startY: 0,
+      lastX: 0,
+      lastY: 0,
+      distance: 0,
+      zoom: MODEL_RENDER_MIN_ZOOM,
+      scrollLeft: 0,
+      scrollTop: 0,
+    };
   };
 
   useEffect(() => {
@@ -1985,6 +2216,10 @@ export default function App() {
             onPointerMove={handleModelRenderPointerMove}
             onPointerUp={stopModelRenderDrag}
             onPointerCancel={stopModelRenderDrag}
+            onTouchStart={handleModelRenderTouchStart}
+            onTouchMove={handleModelRenderTouchMove}
+            onTouchEnd={handleModelRenderTouchEnd}
+            onTouchCancel={handleModelRenderTouchEnd}
           >
             <img
               src={selectedModelRender.render}
