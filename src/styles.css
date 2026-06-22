@@ -139,6 +139,40 @@ a {
     linear-gradient(90deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.34));
 }
 
+@keyframes heroMobileAtmosphere {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1.04);
+    background-position: 50% 50%, 72% 18%, 0% 50%;
+  }
+
+  45% {
+    transform: translate3d(2%, 1.5%, 0) scale(1.08);
+    background-position: 46% 52%, 60% 22%, 54% 50%;
+  }
+
+  100% {
+    transform: translate3d(-1%, 2%, 0) scale(1.06);
+    background-position: 52% 48%, 78% 14%, 100% 50%;
+  }
+}
+
+@keyframes heroVideoFallbackDrift {
+  0% {
+    transform: scale(1.04) translate3d(-1.5%, -1%, 0);
+    background-position: 72% 18%, 0% 50%;
+  }
+
+  50% {
+    transform: scale(1.09) translate3d(1.5%, 1%, 0);
+    background-position: 58% 24%, 64% 50%;
+  }
+
+  100% {
+    transform: scale(1.06) translate3d(-1%, 2%, 0);
+    background-position: 78% 14%, 100% 50%;
+  }
+}
+
 .hero-video {
   position: absolute;
   inset: 0;
@@ -154,7 +188,9 @@ a {
   background:
     radial-gradient(circle at 72% 18%, rgba(23, 44, 143, 0.08), transparent 28%),
     linear-gradient(135deg, #ffffff 0%, #f7f9fd 52%, #edf2f8 100%);
+  background-size: 130% 130%, 180% 180%;
   filter: none;
+  animation: heroVideoFallbackDrift 14s ease-in-out infinite alternate;
 }
 
 .top-nav {
@@ -1275,6 +1311,11 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .poster-hero::after,
+  .hero-video-fallback {
+    animation: none;
+  }
+
   .model-render-track {
     animation: none;
   }
@@ -1511,6 +1552,7 @@ a {
   align-items: center;
   gap: 18px;
   overflow-x: auto;
+  overflow-y: hidden;
   margin: 0;
   padding: 16px 20px;
   border: 0;
@@ -1523,10 +1565,15 @@ a {
     0 1px 0 rgba(255, 255, 255, 0.98) inset,
     0 -18px 46px rgba(255, 255, 255, 0.58) inset;
   transform: translateY(-24px);
-  overflow: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
   isolation: isolate;
   -webkit-backdrop-filter: blur(28px) saturate(1.12);
   backdrop-filter: blur(28px) saturate(1.12);
+}
+
+.gallery-thumbs::-webkit-scrollbar {
+  display: none;
 }
 
 .gallery-thumbs::before {
@@ -1604,7 +1651,7 @@ a {
   display: grid;
   grid-template-rows: 20px 1fr;
   gap: 10px;
-  min-width: min-content;
+  min-width: max-content;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -1627,6 +1674,7 @@ a {
 .gallery-thumb-row {
   display: flex;
   gap: 12px;
+  min-width: max-content;
 }
 
 .gallery-thumbs button {
@@ -2588,6 +2636,12 @@ a {
     padding: 76px 18px 44px;
   }
 
+  .poster-hero::after {
+    inset: -8%;
+    animation: heroMobileAtmosphere 16s ease-in-out infinite alternate;
+    will-change: transform, background-position;
+  }
+
   .hero-video {
     display: block;
     opacity: 0.76;
@@ -2765,7 +2819,7 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px 14px;
     width: min(100%, 390px);
-    margin: -20px auto 0;
+    margin: -5px auto 0;
     padding: 0;
   }
 
@@ -3208,7 +3262,7 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px 12px;
     width: min(100%, 390px);
-    margin-top: -20px;
+    margin-top: -5px;
   }
 
   .stat-strip > div:nth-child(3) {
