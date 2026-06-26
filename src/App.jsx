@@ -847,6 +847,7 @@ function MotionVideo() {
       ? window.matchMedia('(prefers-reduced-motion: no-preference)').matches
       : false
   ));
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [hasVideoError, setHasVideoError] = useState(false);
 
@@ -863,7 +864,42 @@ function MotionVideo() {
     return () => media.removeEventListener('change', update);
   }, []);
 
-  const canShowVideo = shouldRenderVideo && !hasVideoError;
+  useEffect(() => {
+    if (!shouldRenderVideo || hasVideoError) {
+      setShouldLoadVideo(false);
+      setIsVideoReady(false);
+      return undefined;
+    }
+
+    let timeoutId;
+    let idleId;
+
+    const loadVideo = () => setShouldLoadVideo(true);
+    const scheduleLoad = () => {
+      timeoutId = window.setTimeout(loadVideo, 900);
+    };
+
+    if (document.readyState === 'complete') {
+      idleId = window.requestIdleCallback
+        ? window.requestIdleCallback(loadVideo, { timeout: 1600 })
+        : window.setTimeout(loadVideo, 900);
+    } else {
+      window.addEventListener('load', scheduleLoad, { once: true });
+      timeoutId = window.setTimeout(loadVideo, 2600);
+    }
+
+    return () => {
+      window.removeEventListener('load', scheduleLoad);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      if (idleId && window.cancelIdleCallback) {
+        window.cancelIdleCallback(idleId);
+      }
+    };
+  }, [shouldRenderVideo, hasVideoError]);
+
+  const canShowVideo = shouldRenderVideo && shouldLoadVideo && !hasVideoError;
 
   return (
     <>
@@ -879,7 +915,7 @@ function MotionVideo() {
           autoPlay
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           onLoadedData={() => setIsVideoReady(true)}
           onCanPlay={() => setIsVideoReady(true)}
           onError={() => setHasVideoError(true)}
