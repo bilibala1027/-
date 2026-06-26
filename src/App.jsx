@@ -842,33 +842,51 @@ const strengths = [
 ];
 
 function MotionVideo() {
-  const [shouldRenderVideo, setShouldRenderVideo] = useState(false);
+  const [shouldRenderVideo, setShouldRenderVideo] = useState(() => (
+    typeof window !== 'undefined'
+      ? window.matchMedia('(prefers-reduced-motion: no-preference)').matches
+      : false
+  ));
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const [hasVideoError, setHasVideoError] = useState(false);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: no-preference)');
-    const update = () => setShouldRenderVideo(media.matches);
+    const update = () => {
+      setShouldRenderVideo(media.matches);
+      if (!media.matches) {
+        setIsVideoReady(false);
+      }
+    };
     update();
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
 
-  if (!shouldRenderVideo || hasVideoError) {
-    return <div className="hero-video hero-video-fallback" aria-hidden="true" />;
-  }
+  const canShowVideo = shouldRenderVideo && !hasVideoError;
 
   return (
-    <video
-      className="hero-video"
-      src="/assets/hero-background.mp4"
-      muted
-      autoPlay
-      loop
-      playsInline
-      preload="metadata"
-      onError={() => setHasVideoError(true)}
-      aria-hidden="true"
-    />
+    <>
+      <div
+        className={`hero-video hero-video-fallback${isVideoReady ? ' is-muted' : ''}`}
+        aria-hidden="true"
+      />
+      {canShowVideo ? (
+        <video
+          className={`hero-video hero-video-media${isVideoReady ? ' is-ready' : ''}`}
+          src="/assets/hero-background.mp4"
+          muted
+          autoPlay
+          loop
+          playsInline
+          preload="auto"
+          onLoadedData={() => setIsVideoReady(true)}
+          onCanPlay={() => setIsVideoReady(true)}
+          onError={() => setHasVideoError(true)}
+          aria-hidden="true"
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -1532,7 +1550,7 @@ export default function App() {
           clipPath: 'inset(0 0 0% 0)',
           transformOrigin: '50% 100%',
         });
-        gsap.set('.hero-video', { scale: 1, filter: 'saturate(0.82) contrast(1.04) blur(0px)' });
+        gsap.set('.hero-video-media', { scale: 1, filter: 'saturate(0.82) contrast(1.04) blur(0px)' });
         gsap.set('.top-nav, .side-rail, .hero-mini-title', { y: 0, autoAlpha: 1 });
       } else {
         gsap.set(heroTitleParts, {
@@ -1541,7 +1559,7 @@ export default function App() {
           clipPath: 'inset(0 0 100% 0)',
           transformOrigin: '50% 100%',
         });
-        gsap.set('.hero-video', { scale: 1.08, filter: 'saturate(0.62) contrast(1.1) blur(6px)' });
+        gsap.set('.hero-video-media', { scale: 1.035, filter: 'saturate(0.72) contrast(1.08) blur(2px)' });
         gsap.set('.top-nav, .side-rail, .hero-mini-title', { y: -22, autoAlpha: 0 });
         gsap.set('.opening-mask span', { y: 80, autoAlpha: 0, scaleX: 0.82 });
 
@@ -1550,7 +1568,7 @@ export default function App() {
           .to('.opening-mask span', { y: 0, autoAlpha: 1, scaleX: 1, duration: 1.05 })
           .to('.opening-mask span', { y: -42, scaleY: 0.78, duration: 0.72 }, '+=0.08')
           .to('.opening-mask', { clipPath: 'inset(0 0 100% 0)', duration: 1.35 }, '-=0.18')
-          .to('.hero-video', { scale: 1, filter: 'saturate(0.82) contrast(1.04) blur(0px)', duration: 1.45 }, '<')
+          .to('.hero-video-media', { scale: 1, filter: 'saturate(0.82) contrast(1.04) blur(0px)', duration: 1.15 }, '<')
           .to(heroTitleParts, {
             y: 0,
             scaleY: 1,

@@ -176,21 +176,40 @@ a {
 .hero-video {
   position: absolute;
   inset: 0;
-  z-index: -2;
   width: 100%;
   height: 100%;
   object-fit: cover;
   background: #fff;
   filter: saturate(0.82) contrast(1.04);
+  pointer-events: none;
+  transform-origin: 50% 50%;
 }
 
 .hero-video-fallback {
+  z-index: -3;
   background:
     radial-gradient(circle at 72% 18%, rgba(23, 44, 143, 0.08), transparent 28%),
     linear-gradient(135deg, #ffffff 0%, #f7f9fd 52%, #edf2f8 100%);
   background-size: 130% 130%, 180% 180%;
   filter: none;
+  opacity: 1;
   animation: heroVideoFallbackDrift 14s ease-in-out infinite alternate;
+  transition: opacity 900ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hero-video-fallback.is-muted {
+  opacity: 0.34;
+}
+
+.hero-video-media {
+  z-index: -2;
+  opacity: 0;
+  transform: scale(1.015);
+  transition: opacity 820ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hero-video-media.is-ready {
+  opacity: 1;
 }
 
 .top-nav {
