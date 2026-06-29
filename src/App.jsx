@@ -910,7 +910,7 @@ function MotionVideo() {
       {canShowVideo ? (
         <video
           className={`hero-video hero-video-media${isVideoReady ? ' is-ready' : ''}`}
-          src="/assets/hero-background.mp4"
+          src="/assets/hero-background-lite.mp4"
           muted
           autoPlay
           loop
